@@ -1,4 +1,4 @@
 package josefa.webbuppgift.security;
 
-public class FileService {
+public class JwtUtil {
 }

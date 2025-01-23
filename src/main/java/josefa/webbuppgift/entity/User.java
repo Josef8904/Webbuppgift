@@ -2,10 +2,8 @@ package josefa.webbuppgift.entity;
 
 import jakarta.persistence.*;
 
-import java.util.List;
-
 @Entity
-@Table(name = "users")
+@Table(name = "users") // Använd plural för att undvika konflikt med PostgreSQL-reserverat ord "user"
 public class User {
 
     @Id
@@ -17,12 +15,6 @@ public class User {
 
     @Column(nullable = false)
     private String password;
-
-    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL)
-    private List<Folder> folders;
-
-    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL)
-    private List<File> files;
 
     // Getters and setters
     public Long getId() {
@@ -47,21 +39,5 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
-    }
-
-    public List<Folder> getFolders() {
-        return folders;
-    }
-
-    public void setFolders(List<Folder> folders) {
-        this.folders = folders;
-    }
-
-    public List<File> getFiles() {
-        return files;
-    }
-
-    public void setFiles(List<File> files) {
-        this.files = files;
     }
 }

@@ -20,10 +20,9 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/users/register").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/users/register", "/api/users/login").permitAll() // Tillåt registrering och inloggning
+                        .anyRequest().authenticated() // Övriga endpoints kräver autentisering
                 );
         return http.build();
     }
 }
-

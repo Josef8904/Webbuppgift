@@ -1,5 +1,6 @@
 package josefa.webbuppgift.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.List;
 
@@ -24,10 +25,10 @@ public class Folder {
     @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL)
     private List<Folder> subFolders;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL)
     private List<File> files;
 
-    // Getters and setters
     public Long getId() {
         return id;
     }

@@ -4,7 +4,9 @@ import josefa.webbuppgift.entity.User;
 import josefa.webbuppgift.repository.UserRepository;
 import josefa.webbuppgift.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,9 +42,25 @@ public class UserController {
         Optional<User> existingUser = userRepository.findByUsername(user.getUsername());
         if (existingUser.isPresent() && passwordEncoder.matches(user.getPassword(), existingUser.get().getPassword())) {
             String token = jwtUtil.generateToken(user.getUsername());
-            return ResponseEntity.ok(token); // Returnera JWT-token som svar
+            return ResponseEntity.ok(token);
         }
 
-        return ResponseEntity.status(401).body("Invalid username or password");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password");
+    }
+
+    @GetMapping
+    public ResponseEntity<?> getUserByUsername(@RequestParam String username) {
+        String loggedInUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        if (!loggedInUsername.equals(username)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You do not have permission to access this user.");
+        }
+
+        Optional<User> user = userRepository.findByUsername(username);
+        if (user.isPresent()) {
+            return ResponseEntity.ok(user.get());
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
     }
 }

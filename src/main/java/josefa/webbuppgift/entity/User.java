@@ -1,9 +1,10 @@
 package josefa.webbuppgift.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "users") // Använd plural för att undvika konflikt med PostgreSQL-reserverat ord "user"
+@Table(name = "users")
 public class User {
 
     @Id
@@ -13,10 +14,10 @@ public class User {
     @Column(unique = true, nullable = false)
     private String username;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
-    // Getters and setters
     public Long getId() {
         return id;
     }

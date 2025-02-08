@@ -5,7 +5,9 @@ import josefa.webbuppgift.entity.User;
 import josefa.webbuppgift.repository.FolderRepository;
 import josefa.webbuppgift.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,32 +23,44 @@ public class FolderController {
     @Autowired
     private UserRepository userRepository;
 
-    // Skapa en ny mapp
-    @PostMapping("/create")
-    public ResponseEntity<String> createFolder(@RequestBody Folder folder, @RequestParam Long userId) {
-        Optional<User> user = userRepository.findById(userId);
-        if (user.isPresent()) {
-            folder.setOwner(user.get());
-            folderRepository.save(folder);
-            return ResponseEntity.ok("Folder created successfully");
-        }
-        return ResponseEntity.badRequest().body("User not found");
-    }
+    @GetMapping("/user")
+    public ResponseEntity<?> getFoldersForLoggedInUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
-    // Visa alla mappar för en användare
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Folder>> getFoldersByUser(@PathVariable Long userId) {
-        List<Folder> folders = folderRepository.findByOwnerId(userId);
+        System.out.println("Logged-in user: " + username);
+
+        if (username == null || username.isEmpty() || username.equals("anonymousUser")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No user is authenticated.");
+        }
+
+        Optional<User> user = userRepository.findByUsername(username);
+        if (user.isEmpty()) {
+            System.out.println("User not found in the database!");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
+
+        List<Folder> folders = folderRepository.findByOwnerId(user.get().getId());
+
+        System.out.println("Number of folders found: " + folders.size());
+
         return ResponseEntity.ok(folders);
     }
 
-    // Radera en mapp
-    @DeleteMapping("/{folderId}")
-    public ResponseEntity<String> deleteFolder(@PathVariable Long folderId) {
-        if (folderRepository.existsById(folderId)) {
-            folderRepository.deleteById(folderId);
-            return ResponseEntity.ok("Folder deleted successfully");
+    @PostMapping("/create")
+    public ResponseEntity<String> createFolder(@RequestBody Folder folder) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        if (username == null || username.isEmpty() || username.equals("anonymousUser")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No user is authenticated.");
         }
-        return ResponseEntity.badRequest().body("Folder not found");
+
+        Optional<User> user = userRepository.findByUsername(username);
+        if (user.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
+
+        folder.setOwner(user.get());
+        folderRepository.save(folder);
+        return ResponseEntity.ok("Folder created successfully");
     }
 }

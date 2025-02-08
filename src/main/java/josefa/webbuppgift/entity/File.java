@@ -24,7 +24,6 @@ public class File {
     @JoinColumn(name = "user_id")
     private User owner;
 
-    // Getters and setters
     public Long getId() {
         return id;
     }

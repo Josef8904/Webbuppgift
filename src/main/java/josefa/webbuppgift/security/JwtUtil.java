@@ -13,14 +13,15 @@ import java.util.Base64;
 @Component
 public class JwtUtil {
 
-    private static final String SECRET = "aKj82hfj29PohGFYvF4hFgjshf92oFDSF==";
+    private static final String SECRET = "D1pW9XJ1NzIvOhdxVFbqU1AqziQg7dUqzLJXzgW3XvE=";
+
     private final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(Base64.getDecoder().decode(SECRET));
 
     public String generateToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // 10 timmar
                 .signWith(SECRET_KEY, SignatureAlgorithm.HS256)
                 .compact();
     }

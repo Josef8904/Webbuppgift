@@ -27,21 +27,16 @@ public class FolderController {
     public ResponseEntity<?> getFoldersForLoggedInUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
-        System.out.println("Logged-in user: " + username);
-
         if (username == null || username.isEmpty() || username.equals("anonymousUser")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No user is authenticated.");
         }
 
         Optional<User> user = userRepository.findByUsername(username);
         if (user.isEmpty()) {
-            System.out.println("User not found in the database!");
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
         }
 
         List<Folder> folders = folderRepository.findByOwnerId(user.get().getId());
-
-        System.out.println("Number of folders found: " + folders.size());
 
         return ResponseEntity.ok(folders);
     }
@@ -62,5 +57,24 @@ public class FolderController {
         folder.setOwner(user.get());
         folderRepository.save(folder);
         return ResponseEntity.ok("Folder created successfully");
+    }
+
+    @DeleteMapping("/{folderId}")
+    public ResponseEntity<?> deleteFolder(@PathVariable Long folderId) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        Optional<Folder> folderOptional = folderRepository.findById(folderId);
+        if (folderOptional.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Folder not found!");
+        }
+
+        Folder folder = folderOptional.get();
+
+        if (!folder.getOwner().getUsername().equals(username)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You do not own this folder!");
+        }
+
+        folderRepository.delete(folder);
+        return ResponseEntity.ok("Folder deleted successfully!");
     }
 }

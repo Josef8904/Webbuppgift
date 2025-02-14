@@ -36,15 +36,24 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
+
+
                         .requestMatchers(HttpMethod.GET, "/api/users").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/folders/user/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/folders/create").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/files/upload").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/api/files/folder/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/files/download/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/files/folder/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/folders/**").authenticated()  // 🔥 Nu kan du radera mappar!
+                        .requestMatchers(HttpMethod.DELETE, "/api/files/**").authenticated()  // 🔥 Nu kan du radera filer!
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 }

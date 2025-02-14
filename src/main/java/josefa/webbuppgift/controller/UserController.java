@@ -4,9 +4,7 @@ import josefa.webbuppgift.entity.User;
 import josefa.webbuppgift.repository.UserRepository;
 import josefa.webbuppgift.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,41 +24,37 @@ public class UserController {
     private JwtUtil jwtUtil;
 
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@RequestBody User user) {
-        Optional<User> existingUser = userRepository.findByUsername(user.getUsername());
-        if (existingUser.isPresent()) {
+    public ResponseEntity<?> register(@RequestBody User user) {
+        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
             return ResponseEntity.badRequest().body("Username already exists");
         }
 
+        if (user.getPassword() == null || user.getPassword().isEmpty()) {
+            return ResponseEntity.badRequest().body("Password cannot be empty");
+        }
+
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        userRepository.save(user);
-        return ResponseEntity.ok("User registered successfully");
+        User savedUser = userRepository.save(user);
+
+        return ResponseEntity.ok("User registered successfully with ID: " + savedUser.getId());
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody User user) {
-        Optional<User> existingUser = userRepository.findByUsername(user.getUsername());
-        if (existingUser.isPresent() && passwordEncoder.matches(user.getPassword(), existingUser.get().getPassword())) {
-            String token = jwtUtil.generateToken(user.getUsername());
-            return ResponseEntity.ok(token);
+    public ResponseEntity<?> login(@RequestBody User loginRequest) {
+        System.out.println("Användarnamn: " + loginRequest.getUsername());
+        System.out.println("Lösenord: " + loginRequest.getPassword());
+
+        Optional<User> userOpt = userRepository.findByUsername(loginRequest.getUsername());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(403).body("Invalid username or password");
         }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password");
-    }
-
-    @GetMapping
-    public ResponseEntity<?> getUserByUsername(@RequestParam String username) {
-        String loggedInUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-
-        if (!loggedInUsername.equals(username)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You do not have permission to access this user.");
+        User user = userOpt.get();
+        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+            return ResponseEntity.status(403).body("Invalid username or password");
         }
 
-        Optional<User> user = userRepository.findByUsername(username);
-        if (user.isPresent()) {
-            return ResponseEntity.ok(user.get());
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
-        }
+        String token = jwtUtil.generateToken(user.getUsername());
+        return ResponseEntity.ok(token);
     }
 }

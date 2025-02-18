@@ -39,6 +39,7 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
 
+                        .requestMatchers("/login/oauth2/**").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/users").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/folders/user/**").authenticated()
@@ -46,12 +47,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/files/upload").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/files/download/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/files/folder/**").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/api/folders/**").authenticated()  // 🔥 Nu kan du radera mappar!
-                        .requestMatchers(HttpMethod.DELETE, "/api/files/**").authenticated()  // 🔥 Nu kan du radera filer!
+                        .requestMatchers(HttpMethod.DELETE, "/api/folders/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/files/**").authenticated()
 
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .oauth2Login(oauth2 -> oauth2
+                        .defaultSuccessUrl("/api/users/me", true)
+                )
+
+                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

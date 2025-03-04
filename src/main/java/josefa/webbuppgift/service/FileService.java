@@ -1,4 +1,4 @@
-package josefa.webbuppgift.Service;
+package josefa.webbuppgift.service;
 
 import josefa.webbuppgift.entity.File;
 import josefa.webbuppgift.repository.FileRepository;

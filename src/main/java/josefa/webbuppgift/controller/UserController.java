@@ -2,7 +2,7 @@ package josefa.webbuppgift.controller;
 
 import josefa.webbuppgift.entity.User;
 import josefa.webbuppgift.repository.UserRepository;
-import josefa.webbuppgift.service.GitHubService;
+import josefa.webbuppgift.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,14 +12,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
-
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
 
     @Autowired
-    private GitHubService gitHubService;
+    private UserService userService;
 
     @Autowired
     private UserRepository userRepository;
@@ -30,24 +28,16 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not authenticated");
         }
 
-        String githubId = String.valueOf(oAuth2User.getAttribute("id"));
-        System.out.println("🔍 Checking logged-in user: " + githubId);
+        try {
+            User user = userService.processOAuthLogin(oAuth2User);
 
-        String gitHubUserData = gitHubService.getGitHubUserData(oAuth2User);
-        System.out.println("GitHub User Data: " + gitHubUserData);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to process OAuth login.");
+            }
 
-        Optional<User> userOpt = userRepository.findByGithubId(githubId);
-        if (userOpt.isEmpty()) {
-            User newUser = new User();
-            newUser.setGithubId(githubId);
-            newUser.setUsername(String.valueOf(oAuth2User.getAttribute("login")));
-            newUser.setPassword("dummy_password");
-
-            userRepository.save(newUser);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body("User created with dummy password");
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing OAuth login: " + e.getMessage());
         }
-
-        return ResponseEntity.ok(userOpt.get());
     }
 }

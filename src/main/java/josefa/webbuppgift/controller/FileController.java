@@ -2,17 +2,19 @@ package josefa.webbuppgift.controller;
 
 import josefa.webbuppgift.entity.File;
 import josefa.webbuppgift.entity.Folder;
+import josefa.webbuppgift.entity.User;
 import josefa.webbuppgift.repository.FileRepository;
 import josefa.webbuppgift.repository.FolderRepository;
+import josefa.webbuppgift.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,73 +29,86 @@ public class FileController {
     @Autowired
     private FolderRepository folderRepository;
 
-    @PostMapping("/upload")
-    public ResponseEntity<?> uploadFile(@RequestParam("folderId") Long folderId,
-                                        @RequestParam("file") MultipartFile file) {
+    @Autowired
+    private UserRepository userRepository;
+
+
+    private User getAuthenticatedUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (username == null || username.isEmpty() || username.equals("anonymousUser")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No user is authenticated.");
+        }
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
+    @PostMapping("/upload")
+    public ResponseEntity<String> uploadFile(@RequestParam("folderId") Long folderId,
+                                             @RequestParam("file") MultipartFile file) {
+        User user = getAuthenticatedUser();
 
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Folder not found"));
 
-        if (!folder.getOwner().getUsername().equals(username)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You do not own this folder!");
+        if (!folder.getOwner().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this folder!");
         }
 
         try {
             File newFile = new File();
             newFile.setName(file.getOriginalFilename());
             newFile.setContent(file.getBytes());
-            newFile.setOwner(folder.getOwner());
+            newFile.setOwner(user);
             newFile.setFolder(folder);
 
             fileRepository.save(newFile);
             return ResponseEntity.ok("File uploaded successfully!");
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("File upload failed!");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "File upload failed!");
         }
     }
 
-    @Transactional
     @GetMapping("/folder/{folderId}")
     public ResponseEntity<List<File>> getFilesByFolder(@PathVariable Long folderId) {
+        User user = getAuthenticatedUser();
+
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Folder not found"));
+
+        if (!folder.getOwner().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this folder!");
+        }
+
         List<File> files = fileRepository.findByFolderId(folderId);
         return ResponseEntity.ok(files);
     }
 
     @GetMapping("/download/{fileId}")
     public ResponseEntity<byte[]> downloadFile(@PathVariable Long fileId) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = getAuthenticatedUser();
 
-        Optional<File> file = fileRepository.findById(fileId);
-        if (file.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        }
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found"));
 
-        File foundFile = file.get();
-
-        if (!foundFile.getOwner().getUsername().equals(username)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        if (!file.getOwner().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this file!");
         }
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + foundFile.getName() + "\"")
-                .body(foundFile.getContent());
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getName() + "\"")
+                .body(file.getContent());
     }
 
     @DeleteMapping("/delete/{fileId}")
-    public ResponseEntity<?> deleteFile(@PathVariable Long fileId) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+    public ResponseEntity<String> deleteFile(@PathVariable Long fileId) {
+        User user = getAuthenticatedUser();
 
-        Optional<File> fileOptional = fileRepository.findById(fileId);
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found"));
 
-        if (fileOptional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("File not found!");
-        }
 
-        File file = fileOptional.get();
-
-        if (!file.getOwner().getUsername().equals(username)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You do not own this file!");
+        if (!file.getOwner().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this file!");
         }
 
         fileRepository.delete(file);

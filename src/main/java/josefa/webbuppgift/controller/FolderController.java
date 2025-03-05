@@ -7,8 +7,11 @@ import josefa.webbuppgift.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,55 +26,39 @@ public class FolderController {
     @Autowired
     private UserRepository userRepository;
 
+    private User getAuthenticatedUser(Authentication authentication) {
+        if (!(authentication.getPrincipal() instanceof OAuth2User oAuth2User)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
+        String githubId = String.valueOf(oAuth2User.getAttribute("id"));
+        return userRepository.findByGithubId(githubId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
     @GetMapping("/user")
-    public ResponseEntity<?> getFoldersForLoggedInUser() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-
-        if (username == null || username.isEmpty() || username.equals("anonymousUser")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No user is authenticated.");
-        }
-
-        Optional<User> user = userRepository.findByUsername(username);
-        if (user.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
-        }
-
-        List<Folder> folders = folderRepository.findByOwnerId(user.get().getId());
-
+    public ResponseEntity<List<Folder>> getFoldersForLoggedInUser(Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+        List<Folder> folders = folderRepository.findByOwnerId(user.getId());
         return ResponseEntity.ok(folders);
     }
 
     @PostMapping("/create")
-    public ResponseEntity<String> createFolder(@RequestBody Folder folder) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-
-        if (username == null || username.isEmpty() || username.equals("anonymousUser")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No user is authenticated.");
-        }
-
-        Optional<User> user = userRepository.findByUsername(username);
-        if (user.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
-        }
-
-        folder.setOwner(user.get());
+    public ResponseEntity<String> createFolder(@RequestBody Folder folder, Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+        folder.setOwner(user);
         folderRepository.save(folder);
         return ResponseEntity.ok("Folder created successfully");
     }
 
+    @Transactional
     @DeleteMapping("/{folderId}")
-    public ResponseEntity<?> deleteFolder(@PathVariable Long folderId) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+    public ResponseEntity<String> deleteFolder(@PathVariable Long folderId, Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Folder not found"));
 
-        Optional<Folder> folderOptional = folderRepository.findById(folderId);
-        if (folderOptional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Folder not found!");
-        }
-
-        Folder folder = folderOptional.get();
-
-        if (!folder.getOwner().getUsername().equals(username)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You do not own this folder!");
+        if (!folder.getOwner().equals(user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this folder");
         }
 
         folderRepository.delete(folder);

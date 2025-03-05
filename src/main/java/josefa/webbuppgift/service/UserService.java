@@ -14,28 +14,52 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-    public void processOAuthPostLogin(OAuth2User oAuth2User) {
-
+    public User processOAuthLogin(OAuth2User oAuth2User) {
         Object githubIdObj = oAuth2User.getAttribute("id");
-
-        String githubIdString = null;
+        String githubIdString;
 
         if (githubIdObj instanceof Integer) {
-            Integer githubId = (Integer) githubIdObj;
-            githubIdString = String.valueOf(githubId);
-        } else {
             githubIdString = String.valueOf(githubIdObj);
+        } else if (githubIdObj instanceof String) {
+            githubIdString = (String) githubIdObj;
+        } else {
+            System.out.println(" Unknown GitHub ID type: " + (githubIdObj != null ? githubIdObj.getClass().getName() : "null"));
+            return null;
         }
+
+        Object usernameObj = oAuth2User.getAttribute("login");
+        String username;
+
+        if (usernameObj instanceof String) {
+            username = (String) usernameObj;
+        } else {
+            System.out.println(" Unknown username format: " + (usernameObj != null ? usernameObj.getClass().getName() : "null"));
+            return null;
+        }
+
+        System.out.println(" Checking OAuth login: GitHub ID: " + githubIdString + " - Username: " + username);
 
         Optional<User> existingUser = userRepository.findByGithubId(githubIdString);
-
-        if (existingUser.isEmpty()) {
-            User newUser = new User();
-            newUser.setGithubId(githubIdString);
-            userRepository.save(newUser);
-            System.out.println("New GitHub user created: " + githubIdString);
-        } else {
-            System.out.println("User already exists: " + githubIdString);
+        if (existingUser.isPresent()) {
+            System.out.println(" User already exists: " + existingUser.get().getUsername());
+            return existingUser.get();
         }
+
+        Optional<User> userByUsername = userRepository.findByUsername(username);
+        if (userByUsername.isPresent()) {
+            System.out.println(" Username already taken: " + username);
+            username = username + "_" + githubIdString;
+            System.out.println(" New username generated: " + username);
+        }
+
+        User newUser = new User();
+        newUser.setGithubId(githubIdString);
+        newUser.setUsername(username);
+        newUser.setPassword("oauth_user");
+
+        userRepository.save(newUser);
+        System.out.println("New GitHub user created: " + username);
+
+        return newUser;
     }
 }
